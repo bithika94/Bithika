@@ -1,0 +1,121 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(grid)
+library(tidyverse)
+library(readxl)
+library(knitr)
+library(ggplot2)
+library(lubridate)
+library(arules)
+library(arulesViz)
+library(plyr)
+
+library(dplyr)
+```
+
+```{r}
+
+```
+
+```{r}
+on_retail <- read_excel("C:/Users/bithi/OneDrive/Documents/Data Mining/Project/market_basket/Online Retail.xlsx")
+on_retail <- on_retail[complete.cases(on_retail), ]
+on_retail <- on_retail %>% mutate(Description = as.factor(Description))
+on_retail <- on_retail %>% mutate(Country = as.factor(Country))
+on_retail$Date <- as.Date(on_retail$InvoiceDate)
+on_retail$Time <- format(on_retail$InvoiceDate,"%H:%M:%S")
+on_retail$InvoiceNo <- as.numeric(as.character(on_retail$InvoiceNo))
+```
+
+```{r}
+glimpse(on_retail)
+str(on_retail)
+```
+
+```{r}
+on_retail$Time <- as.factor(on_retail$Time)
+t <- hms(as.character(on_retail$Time))
+on_retail$Time = hour(t)
+on_retail %>% 
+  ggplot(aes(x=Time)) + 
+  geom_histogram(stat="count",fill="blue")
+```
+
+```{r}
+detach("package:plyr", unload=TRUE) 
+on_retail %>% 
+  group_by(InvoiceNo) %>% 
+  summarize(n_items = mean(Quantity)) %>%
+  ggplot(aes(x=n_items))+
+  geom_histogram(fill="blue", bins = 100000) + 
+  geom_rug()+
+  coord_cartesian(xlim=c(0,80))
+```
+
+```{r}
+### Top 10 best sellers
+tmp_a <- on_retail %>% 
+  group_by(StockCode, Description) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+tmp_a <- head(tmp_a, n=10)
+tmp_a %>% 
+  ggplot(aes(x=reorder(Description,count), y=count))+
+  geom_bar(stat="identity",fill="blue")+
+  coord_flip()
+```
+
+```{r}
+## Association rules for online retailer
+library(plyr)
+library(dplyr)
+retail_sorted <- on_retail[order(on_retail$CustomerID),]
+itemList <- ddply(retail,c("CustomerID","Date"), 
+                       function(df1)paste(df1$Description, 
+                       collapse = ","))
+```
+
+```{r}
+itemList$CustomerID <- NULL
+itemList$Date <- NULL
+colnames(itemList) <- c("items")
+```
+
+```{r}
+write.csv(itemList,"C:/Users/bithi/OneDrive/Documents/Data Mining/Project/market_basket/market_basket.csv", quote = FALSE, row.names = TRUE)
+```
+
+```{r}
+print('Description of the transactions')
+tr <- read.transactions('C:/Users/bithi/OneDrive/Documents/Data Mining/Project/market_basket/market_basket.csv')
+
+summary(tr)
+```
+
+```{r}
+itemFrequencyPlot(tr, topN=20, type='absolute')
+```
+
+```{r}
+library(arules)
+rules <- apriori(tr, parameter = list(supp=0.001, conf=0.8))
+rules <- sort(rules, by='confidence', decreasing = TRUE)
+summary(rules)
+```
+```{r}
+inspect(rules[1:4])
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
